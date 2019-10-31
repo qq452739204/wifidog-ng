@@ -22,21 +22,14 @@
 #define IPS_HIJACKED    (1 << 31)
 #define IPS_ALLOWED     (1 << 30)
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 17, 19)
-static u32 wd_nat_setup_info(struct sk_buff *skb, struct nf_conn *ct)
-#else
+
 static u32 wd_nat_setup_info(void *priv, struct sk_buff *skb,
     const struct nf_hook_state *state, struct nf_conn *ct)
-#endif
 {
     struct config *conf = get_config();
     struct tcphdr *tcph = tcp_hdr(skb);
     union nf_conntrack_man_proto proto;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 17, 19)
-    struct nf_nat_range2 newrange = {};
-#else
     struct nf_nat_range newrange = {};
-#endif
     static uint16_t PORT_80 = htons(80);
 
     proto.tcp.port = (tcph->dest == PORT_80) ? htons(conf->port) : htons(conf->ssl_port);
@@ -127,11 +120,7 @@ redirect:
         return NF_DROP;
     }
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 17, 19)
-    return wd_nat_setup_info(skb, ct);
-#else
     return nf_nat_ipv4_in(priv, skb, state, wd_nat_setup_info);
-#endif
 }
 
 static struct nf_hook_ops wifidog_ops __read_mostly = {
@@ -149,13 +138,7 @@ static int __init wifidog_init(void)
     if (ret)
         return ret;
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 17, 19)
-    ret = nf_nat_l3proto_ipv4_register_fn(&init_net, &wifidog_ops);
-#elif LINUX_VERSION_CODE > KERNEL_VERSION(4, 12, 14)
     ret = nf_register_net_hook(&init_net, &wifidog_ops);
-#else
-    ret = nf_register_hook(&wifidog_ops);
-#endif
     if (ret < 0) {
         pr_err("can't register hook\n");
         goto remove_config;
@@ -174,19 +157,12 @@ static void __exit wifidog_exit(void)
 {
     deinit_config();
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 17, 19)
-    nf_nat_l3proto_ipv4_unregister_fn(&init_net, &wifidog_ops);
-#elif LINUX_VERSION_CODE > KERNEL_VERSION(4, 12, 14)
     nf_unregister_net_hook(&init_net, &wifidog_ops);
-#else
-    nf_unregister_hook(&wifidog_ops);
-#endif
-
     pr_info("kmod of wifidog-ng is stop\n");
 }
 
 module_init(wifidog_init);
 module_exit(wifidog_exit);
 
-MODULE_AUTHOR("jianhui zhao <zhaojh329@gmail.com>");
+MODULE_AUTHOR("chenbin");
 MODULE_LICENSE("GPL");
